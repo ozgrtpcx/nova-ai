@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nova AI - Chatbot</title>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .chat-container {
+            width: 450px;
+            height: 600px;
+            background: #252526;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .chat-header {
+            background: #333333;
+            padding: 15px;
+            text-align: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-bottom: 1px solid #444;
+        }
+        .chat-messages {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .message {
+            padding: 10px 14px;
+            border-radius: 8px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+        .user {
+            background: #0e639c;
+            align-self: flex-end;
+        }
+        .bot {
+            background: #3e3e42;
+            align-self: flex-start;
+        }
+        .chat-input-area {
+            display: flex;
+            padding: 10px;
+            background: #1e1e1e;
+            border-top: 1px solid #444;
+        }
+        .chat-input-area input {
+            flex: 1;
+            background: #2d2d2d;
+            border: none;
+            color: white;
+            padding: 12px;
+            border-radius: 6px;
+            outline: none;
+        }
+        .chat-input-area button {
+            background: #0e639c;
+            color: white;
+            border: none;
+            padding: 0 16px;
+            margin-left: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .chat-input-area button:hover { background: #1177bb; }
+    </style>
+</head>
+<body>
+
+<div class="chat-container">
+    <div class="chat-header">Nova AI</div>
+    <div class="chat-messages" id="chatMessages">
+        <div class="message bot">Merhaba! Ben Nova AI. Size nasıl yardımcı olabilirim?</div>
+    </div>
+    <div class="chat-input-area">
+        <input type="text" id="userInput" placeholder="Mesajınızı yazın..." onkeypress="handleKeyPress(event)">
+        <button onclick="sendMessage()">Gönder</button>
+    </div>
+</div>
+
+<script>
+    async function sendMessage() {
+        const input = document.getElementById("userInput");
+        const messageText = input.value.trim();
+        if (!messageText) return;
+
+        appendMessage(messageText, "user");
+        input.value = "";
+
+        try {
+            const response = await fetch('/ask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: messageText })
+            });
+            const data = await response.json();
+            appendMessage(data.response, "bot");
+        } catch (error) {
+            appendMessage("Bir bağlantı hatası oluştu.", "bot");
+        }
+    }
+
+    function appendMessage(text, sender) {
+        const messagesContainer = document.getElementById("chatMessages");
+        const msgDiv = document.createElement("div");
+        msgDiv.classList.add("message", sender);
+        msgDiv.innerText = text;
+        messagesContainer.appendChild(msgDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    function handleKeyPress(event) {
+        if (event.key === 'Enter') sendMessage();
+    }
+</script>
+
+</body>
+</html>
