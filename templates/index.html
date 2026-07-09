@@ -81,6 +81,16 @@
             font-weight: bold;
         }
         .chat-input-area button:hover { background: #1177bb; }
+        
+        /* 🎤 Mikrofon Butonunun Özel Tasarımı */
+        #micBtn {
+            background: #2d2d2d;
+            font-size: 1.2rem;
+            transition: all 0.2s ease;
+        }
+        #micBtn:hover {
+            background: #3e3e42;
+        }
     </style>
 </head>
 <body>
@@ -92,11 +102,15 @@
     </div>
     <div class="chat-input-area">
         <input type="text" id="userInput" placeholder="Mesajınızı yazın..." onkeypress="handleKeyPress(event)">
+        <button id="micBtn" onclick="startSpeechRecognition()">🎤</button>
         <button onclick="sendMessage()">Gönder</button>
     </div>
 </div>
 
 <script>
+    // Sesli okuma kontrolü için değişken (Yalnızca mikrofon kullanıldığında tetiklenir)
+    let isSpeakingEnabled = false;
+
     async function sendMessage() {
         const input = document.getElementById("userInput");
         const messageText = input.value.trim();
@@ -113,6 +127,9 @@
             });
             const data = await response.json();
             appendMessage(data.response, "bot");
+            
+            // 🔊 Yapay zekadan gelen yanıtı seslendir (Mikrofon tetiklendiyse çalışır)
+            speakResponse(data.response);
         } catch (error) {
             appendMessage("Bir bağlantı hatası oluştu.", "bot");
         }
@@ -128,7 +145,84 @@
     }
 
     function handleKeyPress(event) {
-        if (event.key === 'Enter') sendMessage();
+        if (event.key === 'Enter') {
+            isSpeakingEnabled = false; // Enter ile gönderildiğinde sesli yanıt vermesin
+            sendMessage();
+        }
+    }
+
+    // 🎤 Ses Tanıma (Speech to Text) Mantığı
+    function startSpeechRecognition() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            alert("Tarayıcınız sesli komut özelliğini desteklemiyor. Lütfen güncel bir tarayıcı kullanın.");
+            return;
+        }
+
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'tr-TR'; // Türkçe dinleme ayarı
+        recognition.interimResults = false;
+        
+        const micBtn = document.getElementById("micBtn");
+
+        recognition.onstart = () => {
+            isSpeakingEnabled = true; // Mikrofonla tetiklendiği için ses modunu açıyoruz
+            micBtn.innerText = "🔴";
+            micBtn.style.background = "#dc2626"; // Dinleme esnasında kırmızı buton
+        };
+
+        recognition.onresult = (event) => {
+            const speechToText = event.results[0][0].transcript;
+            document.getElementById("userInput").value = speechToText;
+            sendMessage(); // Algılanan cümleyi otomatik olarak gönder
+        };
+
+        recognition.onend = () => {
+            micBtn.innerText = "🎤";
+            micBtn.style.background = "#2d2d2d"; // Durduğunda orijinal rengine dön
+        };
+
+        recognition.onerror = () => {
+            micBtn.innerText = "🎤";
+            micBtn.style.background = "#2d2d2d";
+            isSpeakingEnabled = false;
+        };
+
+        recognition.start();
+    }
+
+    // 🔊 Yapay Zeka Cevabını Seslendirme (Text to Speech) Mantığı
+    function speakResponse(text) {
+        // Eğer kullanıcı yazarak gönderdiyse Nova AI sesli konuşmaz, sessiz kalır
+        if (!isSpeakingEnabled) return;
+
+        // Okumayı bozabilecek Markdown kalın yazı işaretlerini (**) temizle
+        const cleanText = text.replace(/\*/g, '');
+
+        // Tarayıcıda arka arkaya ses binişmesini önlemek için önceki okumaları durdur
+        window.speechSynthesis.cancel();
+
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        utterance.lang = 'tr-TR'; // Türkçe seslendirme
+
+        // Sistemdeki Türkçe ses motorunu bul ve seç
+        const voices = window.speechSynthesis.getVoices();
+        const trVoice = voices.find(voice => voice.lang.includes('tr'));
+        if (trVoice) {
+            utterance.voice = trVoice;
+        }
+
+        window.speechSynthesis.speak(utterance);
+
+        // Okuma bittikten sonra durumu sıfırla ki bir sonraki yazılı sohbete etki etmesin
+        utterance.onend = () => {
+            isSpeakingEnabled = false;
+        };
+    }
+
+    // Tarayıcı seslerinin ilk açılışta yüklenmesini tetikle
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.getVoices();
     }
 </script>
 
