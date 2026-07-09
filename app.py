@@ -1,19 +1,28 @@
 import os
-import random
-from datetime import datetime
+import json
 from flask import Flask, render_template, request, jsonify
-import requests
+import google.generativeai as genai
+from datetime import datetime
 
 app = Flask(__name__)
-
-# Vercel için gerekli ana değişken
 app.debug = True
 
-USER_DATA = {
-    "name": None,
-    "role": "Geliştirici",
-    "status": "Çevrim İçi (Nova AI Bulut Modu)"
-}
+# 🔑 API anahtarın eksiksiz ve doğrudan koda gömülü durumdadır
+GEMINI_API_KEY = "AQ.Ab8RN6KSKrVnTPfjxuhSZmciunYY-d_JlK2gXqOeqLCqV_W2Gg"
+genai.configure(api_key=GEMINI_API_KEY)
+
+DATA_FILE = "nova_memory.json"
+
+def load_user_data():
+    if os.path.exists(DATA_FILE):
+        try:
+            with open(DATA_FILE, "r", encoding="utf-8") as f:
+                content = f.read().strip()
+                if content:
+                    return json.loads(content)
+        except:
+            pass
+    return {"name": "Özgür", "role": "Geliştirici"}
 
 @app.route('/')
 def home():
@@ -21,44 +30,34 @@ def home():
 
 @app.route('/ask', methods=['POST'])
 def ask():
-    global USER_DATA
     user_message = request.json.get("message")
+    user_data = load_user_data()
     
-    if not user_message:
-        return jsonify({"response": "Boş mesaj gönderilemez."}), 400
+    # 🗓️ Sistem saatini ve gün adını hatasız bir şekilde alıyoruz
+    simdiki_zaman = datetime.now()
+    tarih_saat_str = simdiki_zaman.strftime("%d.%m.%Y %H:%M:%S")
     
-    msg_lower = user_message.lower()
+    gunler = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
+    bugun_hangi_gun = gunler[simdiki_zaman.weekday()]  # 🛠️ Boşluk hatası düzeltildi!
 
-    # --- LOKAL ÖZEL KOMUTLAR ---
-    if "benim adım" in msg_lower or "benim ismim" in msg_lower:
-        parts = user_message.split()
-        if len(parts) > 2:
-            USER_DATA["name"] = " ".join(parts[2:])
-            return jsonify({"response": f"Memnun oldum {USER_DATA['name']}! Hafızama kaydettim."})
-            
-    elif "ben kimim" in msg_lower or "profil" in msg_lower:
-        if USER_DATA["name"]:
-            return jsonify({"response": f"Sen benim geliştiricim olan *{USER_DATA['name']}* kişisisin!"})
-        else:
-            return jsonify({"response": "Şu an senin kim olduğunu bilmiyorum dostum. 'Benim adım ...' yazabilirsin."})
+    # 🤖 Yapay zekanın her zaman gerçekçi ve doğru bilgiyi vermesini sağlayan sistem talimatı
+    sistem_talimati = (
+        f"Senin adın Nova AI. Kullanıcılara yardımcı olan son derece zeki, "
+        f"samimi, gerçekçi ve fütüristik bir yapay zeka asistanısın. Kısa, net ve doğru cevaplar ver. "
+        f"Konuştuğun kullanıcının adı {user_data.get('name', 'Özgür')}. Ona ismiyle hitap et. "
+        f"KRİTİK GERÇEK ZAMAN BİLGİSİ: Şu anki kesin tarih ve saat: {tarih_saat_str}. Bugün günlerden: {bugun_hangi_gun}. "
+        f"Kullanıcı sana saati, tarihi veya günlerden ne olduğunu sorarsa, asla şaşırmadan veya tahminde bulunmadan direkt buradaki net zaman bilgisini temel alarak kesin doğruları söyleyeceksin."
+    )
 
-    # --- 🚀 GÜVENLİ VE HIZLI YAPAY ZEKA MOTORU ---
-    try:
-        # Açık kaynaklı, bulutlarda asla engellenmeyen hızlı API
-        url = "https://duckduckgo.com/v1/chat"
-        # Not: Eğer DuckDuckGo API'si anlık yanıt vermezse yedek sistem devreye girer
-        
-        sistem_talimati = "Senin adın Nova AI. Kullanıcılara yardımcı olan kibar, zeki ve fütüristik bir yapay zeka asistanısın."
-        if USER_DATA["name"]:
-            sistem_talimati += f" Kullanıcının adı {USER_DATA['name']}."
+    # Arka planda hiçbir try-except engeli veya hata filtresi olmadan mesajı doğrudan modele aktarıyoruz
+    model = genai.GenerativeModel(
+        model_name='models/gemini-2.5-flash',
+        system_instruction=sistem_talimati
+    )
+    
+    response = model.generate_content(user_message)
+    
+    return jsonify({"response": response.text.strip()})
 
-        bot_response = f"Nova AI sistemi başarıyla buluta taşındı! Mesajını aldım: '{user_message}'"
-            
-    except Exception as e:
-        bot_response = "Bağlantı şu an kurulamadı, lütfen tekrar dene."
-
-    return jsonify({"response": bot_response})
-
-# Vercel projeyi WSGI üzerinden çalıştırdığı için bu kısım lokal testler içindir
 if __name__ == '__main__':
-    app.run()
+    app.run(port=5001)
